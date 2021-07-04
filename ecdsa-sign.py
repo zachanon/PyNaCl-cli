@@ -1,40 +1,34 @@
-#modified code from https://cryptobook.nakov.com/digital-signatures/ecdsa-sign-verify-examples to work with the current pycoin package
+from nacl import signing, encoding
 
-from pycoin.ecdsa.secp256k1 import secp256k1_generator as generator
-import hashlib, secrets
+def sign(keyfile, messagefile):
 
+  with open(keyfile) as file:
+    pk = file.readline().strip().encode('utf-8')
+  with open(messagefile) as file:
+    msg = file.readline().encode('utf-8')
 
-def sha3_256Hash(msg):
-  hashBytes = hashlib.sha3_256(msg.encode("utf8")).digest()
-  return int.from_bytes(hashBytes, byteorder="big")
+  encoder = encoding.HexEncoder
+  signer = signing.SigningKey(pk, encoder=encoder)
+  
+  signed = signer.sign(msg, encoder=encoder)
+  verify_key = signer.verify_key.encode(encoder=encoder)
 
-def signECDSAsecp256k1(msg, privKey):
-  msgHash = sha3_256Hash(msg)
-  signature = generator.sign(privKey, msgHash)
-  return signature
+  with open('vkey.pem', 'w') as file:
+    file.write(verify_key.decode())
+  with open('smsg.pem', 'w') as file:
+    file.write(signed.decode())
 
-def verifyECDSAsecp256k1(msg, signature, pubKey):
-  msgHash = sha3_256Hash(msg)
-  valid = generator.verify(pubKey, msgHash, signature)
-  return valid
+def verify(verify_key, signed_message):
 
-# ECDSA sign message (using the curve secp256k1 + SHA3-256)
-msg = "Message for ECDSA signing"
-privKey = secrets.randbelow(generator.order())
-signature = signECDSAsecp256k1(msg, privKey)
-print("Message:", msg)
-print("Private key:", hex(privKey))
-print("Signature: r=" + hex(signature[0]) + ", s=" + hex(signature[1]))
+  with open(verify_key) as file:
+    vkey = file.readline().strip().encode('utf-8')
+  with open(signed_message) as file:
+    smsg = file.readline().strip().encode('utf-8')
+  
+  encoder = encoding.HexEncoder
 
-# ECDSA verify signature (using the curve secp256k1 + SHA3-256)
-pubKey = generator.raw_mul(privKey)
-valid = verifyECDSAsecp256k1(msg, signature, pubKey)
-print("\nMessage:", msg)
-print("Public key: (" + hex(pubKey[0]) + ", " + hex(pubKey[1]) + ")")
-print("Signature valid?", valid)
+  verifier = signing.VerifyKey(vkey, encoder=encoder)
+  return verifier.verify(smsg, encoder=encoder)
 
-# ECDSA verify tampered signature (using the curve secp256k1 + SHA3-256)
-msg = "Tampered message"
-valid = verifyECDSAsecp256k1(msg, signature, pubKey)
-print("\nMessage:", msg)
-print("Signature (tampered msg) valid?", valid)
+sign('key.pem', 'msg.pem')
+verify('vkey.pem', 'smsg.pem')
